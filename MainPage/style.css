@@ -1,0 +1,31 @@
+.toggle-container {
+    position: relative;
+  }
+  
+  .theme-btn {
+    width: 6em;
+    height: 6em;
+    padding: 0.5em;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    background-color: transparent;
+  }
+  
+  .theme-btn img {
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+  }
+  
+  .theme-btn.light {
+    display: none;
+  }
+  
+  .dark .theme-btn.dark {
+    display: none;
+  }
+  
+  .dark .theme-btn.light {
+    display: block;
+  }
