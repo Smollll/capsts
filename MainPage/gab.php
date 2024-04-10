@@ -1,6 +1,4 @@
-
 <?php
-
 if(isset($_POST["submit"])) {
     $targetDir = "uploads/";
     $thumbnailDir = "thumbnails/";
@@ -14,24 +12,6 @@ if(isset($_POST["submit"])) {
 
     $uploadOk = 1;
     $videoFileType = strtolower(pathinfo($videoName, PATHINFO_EXTENSION));
-
-    $title = $_POST['title'];
-    $category = $_POST['category'];
-    $difficulty = $_POST['difficulty'];
-    $video = $_FILES['video']['name'];
-    $price = $_POST['price'];
-    $description = $_POST['description'];
-    
-
-    $con=mysqli_connect("localhost","root","","mainpagetest",'3307');
-    $sql=mysqli_query($con,"INSERT INTO mainpage (course_name,category,difficulty,file_path,price,course_description) VALUES ('$title','$category','$difficulty','$video','$price','$description')");
-
-
-    // Check if file already exists
-    // if (file_exists($targetFile)) {
-    //     echo "Sorry, a file with the same title already exists.";
-    //     $uploadOk = 0;
-    // }
 
     // Check file size
     if ($videoFile["size"] > 50000000) { // 50 MB
@@ -50,39 +30,63 @@ if(isset($_POST["submit"])) {
     if ($uploadOk == 0) {
         echo "Sorry, your file was not uploaded.";
     } else {
-        
-        if (move_uploaded_file($videoFile["tmp_name"], $targetFile)) {
-            echo "The file ". $videoTitle . " has been uploaded.";
-          
-            
-            
-       
+        // Generate thumbnail from original video
+        $ffmpegPath = "D:/Thumbnail/ffmpeg.exe"; // Specify the path to ffmpeg executable
+        $thumbnailCmd = "\"$ffmpegPath\" -i " . escapeshellarg($videoFile["tmp_name"]) . " -ss 00:00:01 -vframes 1 " . escapeshellarg($thumbnailFile);
+        $thumbnailOutput = null;
+        $thumbnailReturnCode = null;
+        exec($thumbnailCmd, $thumbnailOutput, $thumbnailReturnCode);
 
-        
-
-            // Generate thumbnail using ffmpeg
-            $ffmpegPath = "D:/Thumbnail/ffmpeg.exe"; // Specify the path to ffmpeg executable
-            $cmd = "\"$ffmpegPath\" -i " . escapeshellarg($targetFile) . " -ss 00:00:01 -vframes 1 " . escapeshellarg($thumbnailFile);
+        if ($thumbnailReturnCode === 0 && file_exists($thumbnailFile)) {
+            // Thumbnail generated successfully, proceed with compressing the video
+            // Compress video using FFmpeg
             $compressedFile = $targetDir . $videoTitle . "_compressed.mp4"; // Compressed video file
+            $cmd = "\"$ffmpegPath\" -i " . escapeshellarg($videoFile["tmp_name"]) . " -vf scale=1280:-1 -c:v libx264 -crf 23 -preset medium " . escapeshellarg($compressedFile);
             $output = null;
             $returnCode = null;
             exec($cmd, $output, $returnCode);
 
             if ($returnCode === 0) {
-                echo "Thumbnail generated successfully.";
+                // Compression successful, proceed with uploading the compressed video
+                if (file_exists($compressedFile)) {
+                    // Use the same thumbnail for the compressed video
+                    copy($thumbnailFile, $thumbnailDir . $videoTitle . "_compressed.jpg");
+                    echo "The file ". $videoTitle . " and its thumbnail have been uploaded.";
+
+                    // Database insertion
+                    $title = $_POST['title'];
+                    $category = $_POST['category'];
+                    $difficulty = $_POST['difficulty'];
+                    $video = $videoFile['name']; // Use the original video name for the database
+                    $price = $_POST['price'];
+                    $description = $_POST['description'];
+                    $filepath = $targetDir . $videoTitle . "_compressed.mp4";
+                    $con=mysqli_connect("localhost","root","","mainpagetest",'3307');
+                    $sql=mysqli_query($con,"INSERT INTO mainpage (course_name,category,difficulty,file_path,price,course_description) VALUES ('$title','$category','$difficulty','$filepath','$price','$description')");
+                    
+                    header("Location: mainpage.php"); // Redirect to the main page after successful upload
+                    exit(); // Terminate the script after redirection
+                } else {
+                    echo "Sorry, there was an error uploading your file.";
+                }
             } else {
-                echo "Failed to generate thumbnail. Error code: $returnCode";
-                // Log error information
-                file_put_contents("thumbnail_generation_error.log", "Failed to generate thumbnail for file: $targetFile\n", FILE_APPEND);
+                // Compression failed, display an error message
+                echo "Failed to compress the video.";
+                // Log error information if needed
             }
-          
-            header("Location: mainpage.php");
         } else {
-            echo "Sorry, there was an error uploading your file.";
+            // Thumbnail generation failed
+            echo "Failed to generate thumbnail.";
         }
     }
 }
 ?>
+
+
+
+
+
+
 
 
 <!DOCTYPE html>
